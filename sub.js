@@ -158,22 +158,42 @@ SDB.createReadStream = function (opts) {
   var s = r.createReadStream(_opts)
 
   if(_opts.values === false) {
-    var emit = s.emit
-    s.emit = function (event, val) {
-      if(event === 'data') {
-        emit.call(this, 'data', val.substring(p.length))
-      } else
-        emit.call(this, event, val)
+    var read = s.read
+    if (read) {
+      s.read = function (size) {
+        var val = read.call(this, size)
+        if (val) val = val.substring(p.length)
+        return val
+      }
+    } else {
+      var emit = s.emit
+      s.emit = function (event, val) {
+        if(event === 'data') {
+          emit.call(this, 'data', val.substring(p.length))
+        } else
+          emit.call(this, event, val)
+      }
     }
     return s
   } else if(_opts.keys === false)
     return s
-  else
-    return s.on('data', function (d) {
-      //mutate the prefix!
-      //this doesn't work for createKeyStream admittedly.
-      d.key = d.key.substring(p.length)
-    })
+  else {
+    var read = s.read
+    if (read) {
+      s.read = function (size) {
+        var d = read.call(this, size)
+        if (d) d.key = d.key.substring(p.length)
+        return d
+      }
+    } else {
+      s.on('data', function (d) {
+        //mutate the prefix!
+        //this doesn't work for createKeyStream admittedly.
+        d.key = d.key.substring(p.length)
+      })
+    }
+    return s
+  }
 }
 
 
